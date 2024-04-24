@@ -1,0 +1,23 @@
+{
+  "name": "ctj_fase3_backend",
+  "version": "1.0.0",
+  "description": "Backend para o Tech Challenge da Fase 3 do CTJ.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/victorfernandesneto/ctj_fase3_backend.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/victorfernandesneto/ctj_fase3_backend/issues"
+  },
+  "homepage": "https://github.com/victorfernandesneto/ctj_fase3_backend#readme",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
