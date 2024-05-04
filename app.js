@@ -1,10 +1,77 @@
 import supabase from './client.mjs';
 import express from 'express';
+
+async function getMovies(req, res) {
+  try {
+    let { data: filmes, error } = await supabase
+      .from('filmes')
+      .select('*');
+
+    if (error) {
+      console.error('Error fetching movies:', error);
+      return res.status(500).json({ message: 'Failed to retrieve movies' });
+    }
+
+    res.json(filmes);
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+async function toggleWatchedMovie(req, res, movieId) {
+  const userUuid = req.user.uuid;
+
+  try {
+    let { data: assistido, error } = await supabase
+      .from('assistido')
+      .select('*')
+      .eq('filme_id', movieId)
+      .eq('user_id', userUuid);
+
+    if (error) {
+      console.error('Error checking watched movies:', error);
+      return res.status(500).json({ message: 'Failed to check watched status' });
+    }
+
+    if (assistido.length > 0) {
+      const { error } = await supabase
+        .from('assistido')
+        .delete()
+        .eq('id', assistido[0].id);
+
+      if (error) {
+        console.error('Error removing watched movie:', error);
+        return res.status(500).json({ message: 'Failed to remove movie from watched list' });
+      }
+
+      return res.json({ message: 'Movie removed from watched list successfully' });
+    } else {
+      const { data, error } = await supabase
+        .from('assistido')
+        .insert([
+          { filme_id: movieId, user_id: userUuid },
+        ])
+        .select();
+
+      if (error) {
+        console.error('Error marking movie as watched:', error);
+        return res.status(500).json({ message: 'Failed to mark movie as watched' });
+      }
+
+      return res.json({ message: 'Movie marked as watched successfully' });
+    }
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
 const app = express();
 
 app.use(express.json());
 
-app.post('/auth/register', async (req, res) => {
+app.post('/auth/register/', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -25,11 +92,11 @@ app.post('/auth/register', async (req, res) => {
     res.json({ message: 'Signup successful' });
   } catch (err) {
     console.error('Unexpected signup error:', err);
-    res.status(500).json({ message: 'Unexpected error' }); // Generic error message for security
+    res.status(500).json({ message: 'Unexpected error' });
   }
 });
 
-app.post('/auth/login', async (req, res) => {
+app.post('/auth/login/', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -52,6 +119,70 @@ app.post('/auth/login', async (req, res) => {
     console.error('Unexpected login error:', err);
     res.status(500).json({ message: 'Unexpected error' });
   }
+});
+
+app.post('/auth/refresh/', async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(400).json({ message: 'Missing refresh token' });
+  }
+
+  try {
+    const { data, error } = await supabase.auth.refreshSession(refreshToken);
+    if (error) {
+      console.error('Error refreshing token:', error);
+      // Error refreshing token: AuthSessionMissingError: Auth session missing!
+      return res.status(401).json({ message: 'Invalid refresh token' });
+    }
+
+    res.json({ message: 'Access token refreshed successfully', data: { access_token: data.access_token } });
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    res.status(500).json({ message: 'Unexpected error' });
+  }
+});
+
+app.get('/movies/', async (req, res) => {
+  // Working (without auth still)
+  await getMovies(req, res);
+});
+
+app.get('/movies/title/', async (req, res) => {
+  // Working (without auth still)
+  const { title } = req.query;
+
+  if (!title) {
+    return res.status(400).json({ message: 'Missing title parameter' });
+  }
+
+  try {
+    let { data: filmes, error } = await supabase
+      .from('filmes')
+      .select('*')
+      .ilike('titulo', `%${title}%`);
+
+    if (error) {
+      console.error('Error fetching movies:', error);
+      return res.status(500).json({ message: 'Failed to retrieve movies' });
+    }
+
+    res.json(filmes);
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+app.post('/movies/watched', async (req, res) => {
+  // Not working (needs auth to work)
+  const { movieId } = req.body;
+
+  if (!movieId) {
+    return res.status(400).json({ message: 'Missing movie ID' });
+  }
+
+  await toggleWatchedMovie(req, res, movieId);
 });
 
 const port = process.env.PORT || 3000;
