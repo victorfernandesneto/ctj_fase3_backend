@@ -1,5 +1,8 @@
 import supabase from './client.mjs';
 import express from 'express';
+import { GoogleSpreadsheet } from 'google-spreadsheet';
+import { JWT } from 'google-auth-library';
+import creds from './cred.json' assert { type: 'json' };
 
 async function getMovies(req, res) {
   try {
@@ -184,6 +187,23 @@ app.post('/movies/watched', async (req, res) => {
 
   await toggleWatchedMovie(req, res, movieId);
 });
+
+async function addToSheet(filme_sugerido, usuario, timestamp) {
+  const jwt = new JWT({
+    email: creds.client_email,
+    key: creds.private_key,
+    scopes: [
+      'https://www.googleapis.com/auth/spreadsheets',
+    ],
+  });
+  
+  const doc = new GoogleSpreadsheet(process.env.SHEETS_URL, jwt);
+  await doc.loadInfo(); // loads document properties and worksheets
+  console.log(doc.title);
+  const data = [{ filme_sugerido, usuario, timestamp }];
+  await sheet.appendRows(data);
+}
+
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Server listening on port ${port}`));
