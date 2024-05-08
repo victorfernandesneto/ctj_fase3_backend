@@ -10,6 +10,6 @@ Backend para o Tech Challenge da Fase 3 do CTJ.
 
 #### Extra para auxiliar o frontend:
 
-- [ ] Swagger
+- [x] Swagger
 
 Todos os endpoints foram testados utilizando Insomnia.

@@ -3,6 +3,9 @@ import express from 'express';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
 import creds from './cred.json' assert { type: 'json' };
+import options from './swagger.js';
+import swaggerJsdoc from 'swagger-jsdoc';
+import swaggerUi from 'swagger-ui-express';
 
 async function getMovies(req, res) {
   try {
@@ -22,15 +25,13 @@ async function getMovies(req, res) {
   }
 }
 
-async function toggleWatchedMovie(req, res, movieId) {
-  const userUuid = req.user.uuid;
-
+async function toggleWatchedMovie(res, user_uuid, movie_id) {
   try {
     let { data: assistido, error } = await supabase
       .from('assistido')
       .select('*')
-      .eq('filme_id', movieId)
-      .eq('user_id', userUuid);
+      .eq('filme_id', movie_id)
+      .eq('user_id', user_uuid);
 
     if (error) {
       console.error('Error checking watched movies:', error);
@@ -53,7 +54,7 @@ async function toggleWatchedMovie(req, res, movieId) {
       const { data, error } = await supabase
         .from('assistido')
         .insert([
-          { filme_id: movieId, user_id: userUuid },
+          { filme_id: movie_id, user_id: user_uuid },
         ])
         .select();
 
@@ -74,6 +75,32 @@ const app = express();
 
 app.use(express.json());
 
+/**
+ * @swagger
+ * /auth/register/:
+ *   post:
+ *     summary: Registers a new user
+ *     description: Registers a new user by providing email and password in the request body.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 description: The user's email address.
+ *               password:
+ *                 type: string
+ *                 description: The user's password.
+ *     responses:
+ *       200:
+ *         description: Successful user registration. 
+ */
 app.post('/auth/register/', async (req, res) => {
   const { email, password } = req.body;
 
@@ -99,6 +126,32 @@ app.post('/auth/register/', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/login/:
+ *   post:
+ *     summary: Authenticates user
+ *     description: Authenticates a user by providing email and password in the request body.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 description: The user's email address.
+ *               password:
+ *                 type: string
+ *                 description: The user's password.
+ *     responses:
+ *       200:
+ *         description: Successful authentication. Response may include access token or other relevant information for further API calls.
+ */
 app.post('/auth/login/', async (req, res) => {
   const { email, password } = req.body;
 
@@ -124,6 +177,34 @@ app.post('/auth/login/', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/refresh/:
+ *   post:
+ *     summary: Refreshes access token
+ *     description: Refreshes access token by providing a valid 'refresh_token' in the request body.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               refresh_token:
+ *                 type: string
+ *                 description: The refresh token used to generate a new access token.  
+ *     responses:
+ *       200:
+ *         description: Successful retrieval of a new access token.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 access_token:
+ *                   type: string
+ *                   description: The newly generated access token.
+ */
 app.post('/auth/refresh/', async (req, res) => {
   const { access_token, refresh_token } = req.body;
 
@@ -138,7 +219,6 @@ app.post('/auth/refresh/', async (req, res) => {
     })
     if (error) {
       console.error('Error refreshing token:', error);
-      // Error refreshing token: AuthSessionMissingError: Auth session missing!
       return res.status(401).json({ message: 'Invalid refresh token' });
     }
 
@@ -149,13 +229,39 @@ app.post('/auth/refresh/', async (req, res) => {
   }
 });
 
+
+/**
+ * @swagger
+ * /movies/:
+ *   get:
+ *     summary: Get all movies
+ *     description: Retrieves a list of all movies from the database.
+ *     responses:
+ *       200:
+ *         description: Successful retrieval of movies
+ */
 app.get('/movies/', async (req, res) => {
   // Working (without auth still)
   await getMovies(req, res);
 });
 
+/**
+ * @swagger
+ * /movies/title:
+ *   get:
+ *     summary: Get movies that match 'title' query parameter
+ *     description: Retrieves a list of movies that match the provided 'title' query parameter in the URL.
+ *     parameters:
+ *       - in: query
+ *         name: title
+ *         type: string
+ *         required: true
+ *         description: The movie title to search for.
+ *     responses:
+ *       200:
+ *         description: Successful retrieval of movies matching the provided title.
+ */
 app.get('/movies/title/', async (req, res) => {
-  // Working (without auth still)
   const { title } = req.query;
 
   if (!title) {
@@ -180,15 +286,40 @@ app.get('/movies/title/', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /movies/watched/:
+ *   post:
+ *     summary: Mark a movie as watched by the user
+ *     description: Creates a new record in the database indicating the user (identified by user_uuid) has watched the specified movie (identified by movie_id).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - user_uuid
+ *               - movie_id 
+ *             properties:
+ *               user_uuid:
+ *                 type: string
+ *                 description: Unique identifier of the user who watched the movie
+ *               movie_id:
+ *                 type: integer  # Adjust type if movie ID is a different data type
+ *                 description: ID of the movie marked as watched
+ *     responses:
+ *       200:
+ *         description: Successfully marked movie as watched
+ */
 app.post('/movies/watched/', async (req, res) => {
-  // Not working (needs auth to work)
-  const { movieId } = req.body;
+  const { user_uuid, movie_id } = req.body;
 
-  if (!movieId) {
+  if (!movie_id) {
     return res.status(400).json({ message: 'Missing movie ID' });
   }
 
-  await toggleWatchedMovie(req, res, movieId);
+  await toggleWatchedMovie(res, user_uuid, movie_id);
 });
 
 async function addToSheet(titulo, usuario, timestamp) {
@@ -208,6 +339,32 @@ async function addToSheet(titulo, usuario, timestamp) {
   timestamp: timestamp});
 }
 
+/**
+ * @swagger
+ * /movies/suggest/:
+ *   post:
+ *     summary: Suggest a movie to be added to the database
+ *     description: Sends the suggested movie information (title and user) to a Google Sheets' sheet.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - titulo
+ *               - usuario
+ *             properties:
+ *               titulo:
+ *                 type: string
+ *                 description: Title of the suggested movie
+ *               usuario:
+ *                 type: string
+ *                 description: Username of the person suggesting the movie
+ *     responses:
+ *       200:
+ *         description: Successful suggestion submission
+ */
 app.post('/movies/suggest/', async (req, res) => {
   const { titulo, usuario } = req.body;
   const timestamp = new Date().toISOString();
@@ -221,6 +378,9 @@ app.post('/movies/suggest/', async (req, res) => {
   }
 });
 
+const specs = swaggerJsdoc(options);
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Server listening on port ${port}`));
