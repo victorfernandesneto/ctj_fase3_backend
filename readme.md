@@ -2,7 +2,7 @@ Backend para o Tech Challenge da Fase 3 do CTJ.
 
 #### Tecnologias usadas
 
-[![Express.js](https://img.shields.io/badge/Express.js-4.x-brightgreen.svg?style=flat-square)](https://expressjs.com/)
+[![Express.js](https://img.shields.io/badge/Express.js-4.19.2-brightgreen.svg?style=flat-square)](https://expressjs.com/)
 
 #### Funcionalidades a serem implementadas (no backend):
 
