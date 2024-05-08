@@ -1,5 +1,8 @@
 import supabase from './client.mjs';
 import express from 'express';
+import { GoogleSpreadsheet } from 'google-spreadsheet';
+import { JWT } from 'google-auth-library';
+import creds from './cred.json' assert { type: 'json' };
 
 async function getMovies(req, res) {
   try {
@@ -184,6 +187,37 @@ app.post('/movies/watched', async (req, res) => {
 
   await toggleWatchedMovie(req, res, movieId);
 });
+
+async function addToSheet(titulo, usuario, timestamp) {
+  const jwt = new JWT({
+    email: creds.client_email,
+    key: creds.private_key,
+    scopes: [
+      'https://www.googleapis.com/auth/spreadsheets',
+    ],
+  });
+  
+  const doc = new GoogleSpreadsheet(process.env.SHEETS_URL, jwt);
+  await doc.loadInfo(); // loads document properties and worksheets
+  const sheet = doc.sheetsByIndex[0];
+  await sheet.addRow({ titulo: titulo,
+    usuario: usuario,
+  timestamp: timestamp});
+}
+
+app.post('/movies/suggest', async (req, res) => {
+  const { titulo, usuario } = req.body;
+  const timestamp = new Date().toISOString();
+
+  try {
+    await addToSheet(titulo, usuario, timestamp);
+    res.json({ message: 'Movie suggestion added successfully!' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error adding suggestion!' });
+  }
+});
+
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Server listening on port ${port}`));
