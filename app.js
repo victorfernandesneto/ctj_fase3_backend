@@ -125,21 +125,24 @@ app.post('/auth/login/', async (req, res) => {
 });
 
 app.post('/auth/refresh/', async (req, res) => {
-  const { refreshToken } = req.body;
+  const { access_token, refresh_token } = req.body;
 
-  if (!refreshToken) {
+  if (!refresh_token) {
     return res.status(400).json({ message: 'Missing refresh token' });
   }
 
   try {
-    const { data, error } = await supabase.auth.refreshSession(refreshToken);
+    const { data, error } = await supabase.auth.setSession({
+      access_token,
+      refresh_token
+    })
     if (error) {
       console.error('Error refreshing token:', error);
       // Error refreshing token: AuthSessionMissingError: Auth session missing!
       return res.status(401).json({ message: 'Invalid refresh token' });
     }
 
-    res.json({ message: 'Access token refreshed successfully', data: { access_token: data.access_token } });
+    res.json({ message: 'Access token refreshed successfully', data});
   } catch (err) {
     console.error('Unexpected error:', err);
     res.status(500).json({ message: 'Unexpected error' });
@@ -177,7 +180,7 @@ app.get('/movies/title/', async (req, res) => {
   }
 });
 
-app.post('/movies/watched', async (req, res) => {
+app.post('/movies/watched/', async (req, res) => {
   // Not working (needs auth to work)
   const { movieId } = req.body;
 
@@ -205,7 +208,7 @@ async function addToSheet(titulo, usuario, timestamp) {
   timestamp: timestamp});
 }
 
-app.post('/movies/suggest', async (req, res) => {
+app.post('/movies/suggest/', async (req, res) => {
   const { titulo, usuario } = req.body;
   const timestamp = new Date().toISOString();
 
