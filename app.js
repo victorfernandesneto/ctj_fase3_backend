@@ -7,25 +7,39 @@ import options from './swagger.js';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 
+async function verifyUser() {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+}
+
 async function getMovies(req, res) {
-  try {
-    let { data: filmes, error } = await supabase
-      .from('filmes')
-      .select('*');
+  const isAuth = await verifyUser();
+  console.log(isAuth);
+  if (isAuth) {
+    try {
+      let { data: filmes, error } = await supabase
+        .from('filmes')
+        .select('*');
 
-    if (error) {
-      console.error('Error fetching movies:', error);
-      return res.status(500).json({ message: 'Failed to retrieve movies' });
+      if (error) {
+        console.error('Error fetching movies:', error);
+        return res.status(500).json({ message: 'Failed to retrieve movies' });
+      }
+
+      res.json(filmes);
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      res.status(500).json({ message: 'Internal server error' });
     }
-
-    res.json(filmes);
-  } catch (err) {
-    console.error('Unexpected error:', err);
-    res.status(500).json({ message: 'Internal server error' });
+  } else{
+    res.status(401).json({ message: 'User not authorized'});
   }
 }
 
 async function toggleWatchedMovie(res, user_uuid, movie_id) {
+  const isAuth = await verifyUser();
+  console.log(isAuth);
+  if (isAuth) {
   try {
     let { data: assistido, error } = await supabase
       .from('assistido')
@@ -69,6 +83,7 @@ async function toggleWatchedMovie(res, user_uuid, movie_id) {
     console.error('Unexpected error:', err);
     res.status(500).json({ message: 'Internal server error' });
   }
+}
 }
 
 const app = express();
@@ -222,7 +237,7 @@ app.post('/auth/refresh/', async (req, res) => {
       return res.status(401).json({ message: 'Invalid refresh token' });
     }
 
-    res.json({ message: 'Access token refreshed successfully', data});
+    res.json({ message: 'Access token refreshed successfully', data });
   } catch (err) {
     console.error('Unexpected error:', err);
     res.status(500).json({ message: 'Unexpected error' });
@@ -262,6 +277,9 @@ app.get('/movies/', async (req, res) => {
  *         description: Successful retrieval of movies matching the provided title.
  */
 app.get('/movies/title/', async (req, res) => {
+  const isAuth = await verifyUser();
+  console.log(isAuth);
+  if (isAuth) {
   const { title } = req.query;
 
   if (!title) {
@@ -284,6 +302,7 @@ app.get('/movies/title/', async (req, res) => {
     console.error('Unexpected error:', err);
     res.status(500).json({ message: 'Internal server error' });
   }
+}
 });
 
 /**
@@ -313,6 +332,9 @@ app.get('/movies/title/', async (req, res) => {
  *         description: Successfully marked movie as watched
  */
 app.post('/movies/watched/', async (req, res) => {
+  const isAuth = await verifyUser();
+  console.log(isAuth);
+  if (isAuth) {
   const { user_uuid, movie_id } = req.body;
 
   if (!movie_id) {
@@ -320,6 +342,7 @@ app.post('/movies/watched/', async (req, res) => {
   }
 
   await toggleWatchedMovie(res, user_uuid, movie_id);
+}
 });
 
 async function addToSheet(titulo, usuario, timestamp) {
@@ -329,14 +352,17 @@ async function addToSheet(titulo, usuario, timestamp) {
     scopes: [
       'https://www.googleapis.com/auth/spreadsheets',
     ],
-  });
-  
+  }
+);
+
   const doc = new GoogleSpreadsheet(process.env.SHEETS_URL, jwt);
   await doc.loadInfo(); // loads document properties and worksheets
   const sheet = doc.sheetsByIndex[0];
-  await sheet.addRow({ titulo: titulo,
+  await sheet.addRow({
+    titulo: titulo,
     usuario: usuario,
-  timestamp: timestamp});
+    timestamp: timestamp
+  });
 }
 
 /**
@@ -366,6 +392,9 @@ async function addToSheet(titulo, usuario, timestamp) {
  *         description: Successful suggestion submission
  */
 app.post('/movies/suggest/', async (req, res) => {
+  const isAuth = await verifyUser();
+  console.log(isAuth);
+  if (isAuth) {
   const { titulo, usuario } = req.body;
   const timestamp = new Date().toISOString();
 
@@ -376,6 +405,7 @@ app.post('/movies/suggest/', async (req, res) => {
     console.error(error);
     res.status(500).json({ message: 'Error adding suggestion!' });
   }
+}
 });
 
 const specs = swaggerJsdoc(options);
