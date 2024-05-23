@@ -190,58 +190,6 @@ app.post('/auth/login/', async (req, res) => {
   }
 });
 
-/**
- * @swagger
- * /auth/refresh/:
- *   post:
- *     summary: Refreshes access token
- *     description: Refreshes access token by providing a valid 'refresh_token' in the request body.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               refresh_token:
- *                 type: string
- *                 description: The refresh token used to generate a new access token.  
- *     responses:
- *       200:
- *         description: Successful retrieval of a new access token.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 access_token:
- *                   type: string
- *                   description: The newly generated access token.
- */
-app.post('/auth/refresh/', async (req, res) => {
-  const { access_token, refresh_token } = req.body;
-
-  if (!refresh_token) {
-    return res.status(400).json({ message: 'Missing refresh token' });
-  }
-
-  try {
-    const { data, error } = await supabase.auth.setSession({
-      access_token,
-      refresh_token
-    })
-    if (error) {
-      console.error('Error refreshing token:', error);
-      return res.status(401).json({ message: 'Invalid refresh token' });
-    }
-
-    res.json({ message: 'Access token refreshed successfully', data });
-  } catch (err) {
-    console.error('Unexpected error:', err);
-    res.status(500).json({ message: 'Unexpected error' });
-  }
-});
-
 
 /**
  * @swagger
