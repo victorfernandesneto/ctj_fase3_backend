@@ -7,82 +7,72 @@ import options from './swagger.js';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 
-async function verifyUser() {
-  const { data: { user } } = await supabase.auth.getSession();
-  return user;
-}
+
 
 async function getMovies(req, res) {
-  const isAuth = await verifyUser();
-  if (isAuth) {
-    try {
-      let { data: filmes, error } = await supabase
-        .from('filmes')
-        .select('*');
+  try {
+    let { data: filmes, error } = await supabase
+      .from('filmes')
+      .select('*');
 
-      if (error) {
-        console.error('Error fetching movies:', error);
-        return res.status(500).json({ message: 'Failed to retrieve movies' });
-      }
-
-      res.json(filmes);
-    } catch (err) {
-      console.error('Unexpected error:', err);
-      res.status(500).json({ message: 'Internal server error' });
+    if (error) {
+      console.error('Error fetching movies:', error);
+      return res.status(500).json({ message: 'Failed to retrieve movies' });
     }
-  } else {
-    res.status(401).json({ message: 'User not authorized' });
+
+    res.json(filmes);
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    res.status(500).json({ message: 'Internal server error' });
   }
 }
 
 async function toggleWatchedMovie(res, user_uuid, movie_id) {
-  const isAuth = await verifyUser();
-  if (isAuth) {
-    try {
-      let { data: assistido, error } = await supabase
+  try {
+    let { data: assistido, error } = await supabase
+      .from('assistido')
+      .select('*')
+      .eq('filme_id', movie_id)
+      .eq('user_id', user_uuid);
+
+    if (error) {
+      console.error('Error checking watched movies:', error);
+      return res.status(500).json({ message: 'Failed to check watched status' });
+    }
+
+    if (assistido.length > 0) {
+      const { error } = await supabase
         .from('assistido')
-        .select('*')
-        .eq('filme_id', movie_id)
-        .eq('user_id', user_uuid);
+        .delete()
+        .eq('id', assistido[0].id);
 
       if (error) {
-        console.error('Error checking watched movies:', error);
-        return res.status(500).json({ message: 'Failed to check watched status' });
+        console.error('Error removing watched movie:', error);
+        return res.status(500).json({ message: 'Failed to remove movie from watched list' });
       }
 
-      if (assistido.length > 0) {
-        const { error } = await supabase
-          .from('assistido')
-          .delete()
-          .eq('id', assistido[0].id);
+      return res.json({ message: 'Movie removed from watched list successfully' });
+    } else {
+      const { data, error } = await supabase
+        .from('assistido')
+        .insert([
+          { filme_id: movie_id, user_id: user_uuid },
+        ])
+        .select();
 
-        if (error) {
-          console.error('Error removing watched movie:', error);
-          return res.status(500).json({ message: 'Failed to remove movie from watched list' });
-        }
-
-        return res.json({ message: 'Movie removed from watched list successfully' });
-      } else {
-        const { data, error } = await supabase
-          .from('assistido')
-          .insert([
-            { filme_id: movie_id, user_id: user_uuid },
-          ])
-          .select();
-
-        if (error) {
-          console.error('Error marking movie as watched:', error);
-          return res.status(500).json({ message: 'Failed to mark movie as watched' });
-        }
-
-        return res.json({ message: 'Movie marked as watched successfully' });
+      if (error) {
+        console.error('Error marking movie as watched:', error);
+        return res.status(500).json({ message: 'Failed to mark movie as watched' });
       }
-    } catch (err) {
-      console.error('Unexpected error:', err);
-      res.status(500).json({ message: 'Internal server error' });
+
+      return res.json({ message: 'Movie marked as watched successfully' });
     }
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    res.status(500).json({ message: 'Internal server error' });
   }
 }
+
 
 const app = express();
 
@@ -223,34 +213,30 @@ app.get('/movies/', async (req, res) => {
  *         description: Successful retrieval of movies matching the provided title.
  */
 app.get('/movies/title/', async (req, res) => {
-  const isAuth = await verifyUser();
-  if (isAuth) {
-    const { title } = req.query;
+  const { title } = req.query;
 
-    if (!title) {
-      return res.status(400).json({ message: 'Missing title parameter' });
-    }
-
-    try {
-      let { data: filmes, error } = await supabase
-        .from('filmes')
-        .select('*')
-        .ilike('titulo', `%${title}%`);
-
-      if (error) {
-        console.error('Error fetching movies:', error);
-        return res.status(500).json({ message: 'Failed to retrieve movies' });
-      }
-
-      res.json(filmes);
-    } catch (err) {
-      console.error('Unexpected error:', err);
-      res.status(500).json({ message: 'Internal server error' });
-    }
-  } else {
-    res.status(401).json({ message: 'User not authorized' });
+  if (!title) {
+    return res.status(400).json({ message: 'Missing title parameter' });
   }
-});
+
+  try {
+    let { data: filmes, error } = await supabase
+      .from('filmes')
+      .select('*')
+      .ilike('titulo', `%${title}%`);
+
+    if (error) {
+      console.error('Error fetching movies:', error);
+      return res.status(500).json({ message: 'Failed to retrieve movies' });
+    }
+
+    res.json(filmes);
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+);
 
 /**
  * @swagger
@@ -279,44 +265,36 @@ app.get('/movies/title/', async (req, res) => {
  *         description: Successfully marked movie as watched
  */
 app.post('/movies/watched/', async (req, res) => {
-  const isAuth = await verifyUser();
-  if (isAuth) {
-    const { user_uuid, movie_id } = req.body;
+  const { user_uuid, movie_id } = req.body;
 
-    if (!movie_id) {
-      return res.status(400).json({ message: 'Missing movie ID' });
-    }
-
-    await toggleWatchedMovie(res, user_uuid, movie_id);
-  } else {
-    res.status(401).json({ message: 'User not authorized' });
+  if (!movie_id) {
+    return res.status(400).json({ message: 'Missing movie ID' });
   }
-});
+
+  await toggleWatchedMovie(res, user_uuid, movie_id);
+}
+);
 
 async function getWatchedMovies(req, res) {
-  const isAuth = await verifyUser();
-  if (isAuth) {
-    try {
-      let user_uuid=req.user_uuid;
-      let { data: filmes, error } = await supabase
-        .from('assistido')
-        .select('*')
-        .eq('user_id', user_uuid);
+  try {
+    let user_uuid = req.user_uuid;
+    let { data: filmes, error } = await supabase
+      .from('assistido')
+      .select('*')
+      .eq('user_id', user_uuid);
 
-      if (error) {
-        console.error('Error fetching movies:', error);
-        return res.status(500).json({ message: 'Failed to retrieve watched movies' });
-      }
-
-      res.json(filmes);
-    } catch (err) {
-      console.error('Unexpected error:', err);
-      res.status(500).json({ message: 'Internal server error' });
+    if (error) {
+      console.error('Error fetching movies:', error);
+      return res.status(500).json({ message: 'Failed to retrieve watched movies' });
     }
-  } else {
-    res.status(401).json({ message: 'User not authorized' });
+
+    res.json(filmes);
+  } catch (err) {
+    console.error('Unexpected error:', err);
+    res.status(500).json({ message: 'Internal server error' });
   }
 }
+
 
 /**
  * @swagger
@@ -391,20 +369,15 @@ async function addToSheet(titulo, usuario, timestamp) {
  *         description: Successful suggestion submission
  */
 app.post('/movies/suggest/', async (req, res) => {
-  const isAuth = await verifyUser();
-  if (isAuth) {
-    const { titulo, usuario } = req.body;
-    const timestamp = new Date().toISOString();
+  const { titulo, usuario } = req.body;
+  const timestamp = new Date().toISOString();
 
-    try {
-      await addToSheet(titulo, usuario, timestamp);
-      res.json({ message: 'Movie suggestion added successfully!' });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Error adding suggestion!' });
-    }
-  } else {
-    res.status(401).json({ message: 'User not authorized' });
+  try {
+    await addToSheet(titulo, usuario, timestamp);
+    res.json({ message: 'Movie suggestion added successfully!' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error adding suggestion!' });
   }
 });
 
