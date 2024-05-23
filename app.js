@@ -293,6 +293,57 @@ app.post('/movies/watched/', async (req, res) => {
   }
 });
 
+async function getWatchedMovies(req, res) {
+  const isAuth = await verifyUser();
+  if (isAuth) {
+    try {
+      let user_uuid=req.user_uuid;
+      let { data: filmes, error } = await supabase
+        .from('assistido')
+        .select('*')
+        .eq('user_id', user_uuid);
+
+      if (error) {
+        console.error('Error fetching movies:', error);
+        return res.status(500).json({ message: 'Failed to retrieve watched movies' });
+      }
+
+      res.json(filmes);
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  } else {
+    res.status(401).json({ message: 'User not authorized' });
+  }
+}
+
+/**
+ * @swagger
+ * /movies/watched/:
+ *   get:
+ *     summary: Get all watched movies
+ *     description: Retrieves a list of all watched movies by the user from the database.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - user_uuid
+ *             properties:
+ *               user_uuid:
+ *                 type: string
+ *                 description: Unique identifier of the user
+ *     responses:
+ *       200:
+ *         description: Successful retrieval of watched movies
+ */
+app.get('/movies/watched/', async (req, res) => {
+  await getWatchedMovies(req, res);
+});
+
 async function addToSheet(titulo, usuario, timestamp) {
   const jwt = new JWT({
     email: creds.client_email,
