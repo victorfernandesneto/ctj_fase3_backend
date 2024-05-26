@@ -1,5 +1,6 @@
 import supabase from './client.mjs';
 import express from 'express';
+import cors from 'cors';
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
 import creds from './cred.json' assert { type: 'json' };
@@ -76,6 +77,7 @@ async function toggleWatchedMovie(res, user_uuid, movie_id) {
 
 const app = express();
 
+app.use(cors());
 app.use(express.json());
 
 /**
