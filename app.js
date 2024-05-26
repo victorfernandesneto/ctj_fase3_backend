@@ -301,23 +301,19 @@ async function getWatchedMovies(req, res) {
 
 /**
  * @swagger
- * /movies/watched/:
+ * /movies/title:
  *   get:
- *     summary: Get all watched movies
- *     description: Retrieves a list of all watched movies by the user from the database.
+ *     summary: Get all watched movies based on user UUID
+ *     description: Retrieves a list of movies that match the provided 'user_uuid' query parameter in the URL.
  *     parameters:
  *       - in: query
- *         name: title
+ *         name: user_uuid
  *         type: string
  *         required: true
- *         description: Unique identifier of the user
- *             properties:
- *               user_uuid:
- *                 type: string
- *                 description: Unique identifier of the user
+ *         description: The movie title to search for.
  *     responses:
  *       200:
- *         description: Successful retrieval of watched movies
+ *         description: Successful retrieval of movies matching the provided title.
  */
 app.get('/movies/watched/', async (req, res) => {
   await getWatchedMovies(req, res);
