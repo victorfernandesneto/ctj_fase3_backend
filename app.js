@@ -279,7 +279,8 @@ app.post('/movies/watched/', async (req, res) => {
 
 async function getWatchedMovies(req, res) {
   try {
-    let user_uuid = req.user_uuid;
+    let { user_uuid }  = req.query;
+    
     let { data: filmes, error } = await supabase
       .from('assistido')
       .select('*')
@@ -304,14 +305,12 @@ async function getWatchedMovies(req, res) {
  *   get:
  *     summary: Get all watched movies
  *     description: Retrieves a list of all watched movies by the user from the database.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - user_uuid
+ *     parameters:
+ *       - in: query
+ *         name: title
+ *         type: string
+ *         required: true
+ *         description: Unique identifier of the user
  *             properties:
  *               user_uuid:
  *                 type: string
